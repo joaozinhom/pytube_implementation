@@ -16,6 +16,7 @@
           buildInputs = [
             python
             python.pkgs.pip
+            pkgs.uv
             pkgs.ffmpeg
             pkgs.stdenv.cc.cc.lib
           ];
