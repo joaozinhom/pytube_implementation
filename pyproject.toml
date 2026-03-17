@@ -6,7 +6,15 @@ requires-python = ">=3.10"
 
 dependencies = [
     "pytubefix>=8.0.0",
+    "poethepoet>=0.41.0",
 ]
 
 [tool.uv]
 package = false
+
+[tool.poe.tasks]
+main = "python src/main.py"
+audio = "python src/audio.py"
+mp3 = "python  src/mp3.py"
+playlist = "python run src/playlist.py"
+playlist_of_yt = "python run src/playlist_of_yt.py"

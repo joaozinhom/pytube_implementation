@@ -9,8 +9,8 @@ A collection of Python scripts for downloading YouTube videos, audio-only stream
 | `main.py` | Download a YouTube video at highest resolution |
 | `audio.py` | Download audio-only stream from a video |
 | `mp3.py` | Download and save as `.mp3` |
-| `playlist.py` | dowload all audios listed in liks.txt |
-| `playlist_of_yt.py` |Dowload all audios from a yt playlist link|
+| `playlist.py` | Download all audios listed in `links.txt` |
+| `playlist_of_yt.py` | Download all audios from a YouTube playlist link |
 
 ## Installation & Usage
 
@@ -22,24 +22,18 @@ cd pytube_implementation
 
 uv sync
 ```
-
-That's it. Now run any script with:
+Then run any task with `uv  run poe <task>` (or `poe <task>`):
 
 ```bash
-uv run main.py
-uv run audio.py
-uv run mp3.py
-uv run playlist.py
-uv run playlist_of_yt.py
+uv run poe  main            # runs python src/main.py — Download a YouTube video at highest resolution
+uv run poe audio           # runs python src/audio.py — Download audio-only stream from a video
+uv run poe mp3             # runs python src/mp3.py — Download and save as .mp3
+uv run poe playlist        # runs python src/playlist.py — Download all audios listed in links.txt
+uv run poe  playlist_of_yt  # runs python src/playlist_of_yt.py — Download all audios from a YouTube playlist link
 ```
 
-`uv sync` reads `pyproject.toml`, creates an isolated environment, and installs all dependencies automatically. No manual venv activation needed.
+These tasks are defined in `pyproject.toml` under `[tool.poe.tasks]` and point to the scripts in `src/`.
 
 ## Requirements
 
-- [uv](https://docs.astral.sh/uv/) — install it with `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Python 3.10+ (uv will manage this for you)
-
-## License
-
-MIT
+- [uv](https://docs.astral.sh/uv/)
