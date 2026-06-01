@@ -16,5 +16,5 @@ package = false
 main = "python src/main.py"
 audio = "python src/audio.py"
 mp3 = "python  src/mp3.py"
-playlist = "python run src/playlist.py"
-playlist_of_yt = "python run src/playlist_of_yt.py"
+playlist = "python src/playlist.py"
+playlist_of_yt = "python src/playlist_of_yt.py"
