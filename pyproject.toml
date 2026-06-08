@@ -3,18 +3,63 @@ name = "pytube-implementation"
 version = "0.1.0"
 description = "YouTube video/audio/playlist downloader using pytubefix"
 requires-python = ">=3.10"
-
 dependencies = [
     "pytubefix>=8.0.0",
     "poethepoet>=0.41.0",
+    "mutagen>=1.47.0",
+    "requests>=2.32.0",
 ]
 
 [tool.uv]
 package = false
 
 [tool.poe.tasks]
-main = "python src/main.py"
-audio = "python src/audio.py"
-mp3 = "python  src/mp3.py"
-playlist = "python src/playlist.py"
+main           = "python src/main.py"
+audio          = "python src/audio.py"
+mp3            = "python src/mp3.py"
+playlist       = "python src/playlist.py"
 playlist_of_yt = "python src/playlist_of_yt.py"
+
+# Tag all files (title + artist)
+# Usage: poe tagger ~/Music/code
+[tool.poe.tasks.tagger]
+cmd  = "python src/tagger.py ${directory}"
+help = "Tag all .m4a files with title + artist from MusicBrainz/Last.fm"
+
+[[tool.poe.tasks.tagger.args]]
+name       = "directory"
+positional = true
+help       = "Root folder with .m4a files (recursive)"
+
+# Retag only files with no title tag yet
+# Usage: poe tagger-failed ~/Music/code
+[tool.poe.tasks.tagger-failed]
+cmd  = "python src/tagger.py ${directory} --retag-failed"
+help = "Tag only .m4a files that have no title tag yet"
+
+[[tool.poe.tasks.tagger-failed.args]]
+name       = "directory"
+positional = true
+help       = "Root folder with .m4a files (recursive)"
+
+# Fetch and embed album art
+# Usage: poe covers ~/Music/code
+[tool.poe.tasks.covers]
+cmd  = "python src/cover_fetcher.py ${directory}"
+help = "Fetch and embed album art into .m4a files"
+
+[[tool.poe.tasks.covers.args]]
+name       = "directory"
+positional = true
+help       = "Root folder with .m4a files (recursive)"
+
+# Dry-run covers
+# Usage: poe covers-dry ~/Music/code
+[tool.poe.tasks.covers-dry]
+cmd  = "python src/cover_fetcher.py ${directory} --dry-run"
+help = "Dry-run: show what covers would do without embedding"
+
+[[tool.poe.tasks.covers-dry.args]]
+name       = "directory"
+positional = true
+help       = "Root folder with .m4a files (recursive)"
