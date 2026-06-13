@@ -1,6 +1,6 @@
 """
 tagger.py — Music metadata tagger for .m4a files
-Reads filename, queries MusicBrainz API, falls back to Last.fm.
+Reads filename, queries MusicBrainz API, falls back to iTunes API.
 Writes title and artist tags.
 
 Usage (standalone):
@@ -25,8 +25,7 @@ from mutagen.mp4 import MP4
 # ─── Constants ────────────────────────────────────────────────────────────────
 
 MUSICBRAINZ_API = "https://musicbrainz.org/ws/2/recording"
-LASTFM_API      = "https://ws.audioscrobbler.com/2.0/"
-LASTFM_API_KEY  = "REMOVED"
+ITUNES_API      = "https://itunes.apple.com/search"
 
 HEADERS = {
     "User-Agent": "MusicTagger/1.0 (github.com/joaozinhom/pytube_implementation)"
@@ -107,29 +106,17 @@ NOISE_PATTERNS = [
 def normalize(filename: str) -> str:
     """
     Normalize unicode separators and decorative characters before any parsing.
-
-    Fixes:
-    - Em dash / en dash → regular hyphen  (DAFT PUNK – AROUND THE WORLD)
-    - Decorative unicode letters → plain   (G̲o̲rillaz)
-    - Curly quotes → removed               (Regina Spektor - "Don't Leave Me")
-    - Double spaces → single
     """
-    # Em dash (—), en dash (–), figure dash (‒), horizontal bar (―) → " - "
     name = re.sub(r'\s*[–—‒―]\s*', ' - ', filename)
 
-    # Remove decorative combining unicode (underline/overline diacritics etc.)
-    # This fixes "G̲o̲rillaz" → "Gorillaz"
     import unicodedata
     name = ''.join(
         c for c in unicodedata.normalize('NFD', name)
-        if unicodedata.category(c) != 'Mn'  # Mn = non-spacing mark
+        if unicodedata.category(c) != 'Mn'
     )
 
-    # Remove curly quotes and straight quotes
     name = name.replace('"', '').replace('\u201c', '').replace('\u201d', '')
-    name = name.replace("'", "'")  # normalize curly apostrophe
-
-    # Collapse double spaces
+    name = name.replace("'", "'")
     name = re.sub(r'\s{2,}', ' ', name).strip()
 
     return name
@@ -138,9 +125,6 @@ def normalize(filename: str) -> str:
 # ─── Step 2: Clean filename ───────────────────────────────────────────────────
 
 def clean_filename(filename: str) -> str:
-    """
-    Remove .m4a extension, normalize, then strip all noise patterns.
-    """
     name = os.path.splitext(filename)[0]
     name = normalize(name)
 
@@ -154,10 +138,6 @@ def clean_filename(filename: str) -> str:
 # ─── Step 3: Parse artist and title ──────────────────────────────────────────
 
 def parse_artist_title(cleaned: str) -> tuple[str | None, str]:
-    """
-    Detects "Artist - Title" or inverted "Title - Artist".
-    Falls back to (None, cleaned) if no separator found.
-    """
     if ' - ' not in cleaned:
         return None, cleaned.strip()
 
@@ -165,7 +145,6 @@ def parse_artist_title(cleaned: str) -> tuple[str | None, str]:
     left  = left.strip()
     right = right.strip()
 
-    # Inverted detection: right token is a known artist
     if right.lower() in KNOWN_ARTISTS:
         return right, left
 
@@ -196,36 +175,28 @@ def search_musicbrainz(artist: str | None, title: str) -> str | None:
     return None
 
 
-# ─── Step 4b: Last.fm fallback ───────────────────────────────────────────────
+# ─── Step 4b: iTunes fallback ────────────────────────────────────────────────
 
-def search_lastfm(artist: str | None, title: str) -> tuple[str | None, str | None]:
+def search_itunes(artist: str | None, title: str) -> tuple[str | None, str | None]:
     """
     Returns (canonical_title, canonical_artist) or (None, None).
+    No API key required.
     """
-    params = {
-        "method":      "track.search",
-        "track":       title,
-        "api_key":     LASTFM_API_KEY,
-        "format":      "json",
-        "limit":       1,
-        "autocorrect": 1,
-    }
-    if artist:
-        params["artist"] = artist
+    term = f"{artist} {title}" if artist else title
 
     try:
-        r = requests.get(LASTFM_API, params=params, timeout=10)
-        r.raise_for_status()
-        matches = (
-            r.json()
-             .get("results", {})
-             .get("trackmatches", {})
-             .get("track", [])
+        r = requests.get(
+            ITUNES_API,
+            params={"term": term, "media": "music", "limit": 1},
+            timeout=10,
         )
-        if matches:
-            return matches[0].get("name"), matches[0].get("artist")
+        r.raise_for_status()
+        results = r.json().get("results", [])
+        if results:
+            return results[0].get("trackName"), results[0].get("artistName")
     except requests.RequestException as e:
-        print(f"    [LFM ERROR] {e}")
+        print(f"    [iTunes ERROR] {e}")
+
     return None, None
 
 
@@ -265,7 +236,7 @@ def process_library(root_dir: str, only_untagged: bool = False) -> None:
                 try:
                     audio = MP4(fp)
                     if "\xa9nam" in audio:
-                        continue  # already tagged, skip
+                        continue
                 except Exception:
                     pass
             m4a_files.append(fp)
@@ -289,25 +260,24 @@ def process_library(root_dir: str, only_untagged: bool = False) -> None:
 
         # MusicBrainz
         canonical_title  = search_musicbrainz(artist, title)
-        canonical_artist = artist  # MB doesn't return artist in basic query
+        canonical_artist = artist
 
         if canonical_title:
             source = "MB"
         else:
-            print(f"    [MB] not found — trying Last.fm...")
-            canonical_title, lfm_artist = search_lastfm(artist, title)
+            print(f"    [MB] not found — trying iTunes...")
+            canonical_title, itunes_artist = search_itunes(artist, title)
             if canonical_title:
-                source = "LFM"
-                # Use Last.fm artist if we didn't have one from filename
-                if not canonical_artist and lfm_artist:
-                    canonical_artist = lfm_artist
+                source = "iTunes"
+                if not canonical_artist and itunes_artist:
+                    canonical_artist = itunes_artist
             else:
                 source = None
 
         time.sleep(1)  # MusicBrainz rate limit
 
         if not canonical_title:
-            print(f"    [NOT FOUND] Neither MB nor Last.fm matched\n")
+            print(f"    [NOT FOUND] Neither MB nor iTunes matched\n")
             failed.append(filepath)
             continue
 
@@ -339,7 +309,7 @@ def process_library(root_dir: str, only_untagged: bool = False) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Tag .m4a files with title + artist from MusicBrainz/Last.fm."
+        description="Tag .m4a files with title + artist from MusicBrainz/iTunes."
     )
     parser.add_argument("directory", help="Root folder with .m4a files (recursive)")
     parser.add_argument(
