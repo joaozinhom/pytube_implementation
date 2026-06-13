@@ -1,6 +1,6 @@
 """
 cover_fetcher.py — Fetches and embeds album art into .m4a files
-Pipeline: MusicBrainz/CAA → Last.fm → iTunes API
+Pipeline: MusicBrainz/CAA → iTunes API
 
 Usage (standalone):
     python src/cover_fetcher.py /path/to/music/folder
@@ -26,8 +26,6 @@ from mutagen.mp4 import MP4, MP4Cover
 
 MUSICBRAINZ_API = "https://musicbrainz.org/ws/2/recording"
 COVER_ART_API   = "https://coverartarchive.org/release"
-LASTFM_API      = "https://ws.audioscrobbler.com/2.0/"
-LASTFM_API_KEY  = "6b1be31a913a275ee57a7906b93cc98c"
 ITUNES_API      = "https://itunes.apple.com/search"
 
 HEADERS = {
@@ -119,45 +117,7 @@ def download_cover_caa(release_id: str) -> bytes | None:
     return None
 
 
-# ─── Step 4: Last.fm fallback ────────────────────────────────────────────────
-
-def get_cover_lastfm(title: str, artist: str | None) -> bytes | None:
-    """
-    Uses track.getInfo to get album art URL, then downloads it.
-    """
-    params = {
-        "method":      "track.getInfo",
-        "track":       title,
-        "api_key":     LASTFM_API_KEY,
-        "format":      "json",
-        "autocorrect": 1,
-    }
-    if artist:
-        params["artist"] = artist
-
-    try:
-        r = requests.get(LASTFM_API, params=params, timeout=10)
-        r.raise_for_status()
-        images = (
-            r.json()
-             .get("track", {})
-             .get("album", {})
-             .get("image", [])
-        )
-        # Pick largest available image (last in list = extralarge)
-        for img in reversed(images):
-            url = img.get("#text", "")
-            if url and "2a96cbd8b46e442fc41c2b86b821562f" not in url:
-                # Last.fm returns a placeholder hash when no image exists
-                resp = requests.get(url, timeout=15)
-                if resp.status_code == 200 and resp.content:
-                    return resp.content
-    except requests.RequestException as e:
-        print(f"    [LFM ERROR] {e}")
-    return None
-
-
-# ─── Step 5: iTunes API fallback ─────────────────────────────────────────────
+# ─── Step 4: iTunes API fallback ─────────────────────────────────────────────
 
 def get_cover_itunes(title: str, artist: str | None) -> bytes | None:
     """
@@ -196,7 +156,7 @@ def get_cover_itunes(title: str, artist: str | None) -> bytes | None:
     return None
 
 
-# ─── Step 6: Embed cover ──────────────────────────────────────────────────────
+# ─── Step 5: Embed cover ──────────────────────────────────────────────────────
 
 def embed_cover(filepath: str, image_bytes: bytes) -> None:
     """
@@ -213,12 +173,12 @@ def embed_cover(filepath: str, image_bytes: bytes) -> None:
     audio.save()
 
 
-# ─── Step 7: Process library ─────────────────────────────────────────────────
+# ─── Step 6: Process library ─────────────────────────────────────────────────
 
 def process_library(root_dir: str, dry_run: bool = False) -> None:
     """
     Walks root_dir, skips files that already have covr tag.
-    Pipeline per file: MusicBrainz/CAA → Last.fm → iTunes
+    Pipeline per file: MusicBrainz/CAA → iTunes
     """
     failed  = []
     total   = 0
@@ -275,16 +235,9 @@ def process_library(root_dir: str, dry_run: bool = False) -> None:
                 if image_bytes:
                     source = "MusicBrainz/CAA"
 
-        # ── Last.fm ───────────────────────────────────────────────────────────
-        if not image_bytes:
-            print(f"    [MB/CAA] no cover — trying Last.fm...")
-            image_bytes = get_cover_lastfm(title, artist)
-            if image_bytes:
-                source = "Last.fm"
-
         # ── iTunes ────────────────────────────────────────────────────────────
         if not image_bytes:
-            print(f"    [LFM] no cover — trying iTunes...")
+            print(f"    [MB/CAA] no cover — trying iTunes...")
             image_bytes = get_cover_itunes(title, artist)
             if image_bytes:
                 source = "iTunes"

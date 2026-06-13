@@ -2,3 +2,5 @@ flake.lock
 .venv/*
 .venv
 .pytube
+backup_music_PC/*
+.DS_Store
