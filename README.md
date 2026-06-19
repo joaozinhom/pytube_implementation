@@ -37,3 +37,5 @@ These tasks are defined in `pyproject.toml` under `[tool.poe.tasks]` and point t
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/)
+
+for f in *.m4a; do ffmpeg -i "$f" -codec:a libmp3lame -q:a 2 "${f%.m4a}.mp3"; done
